@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Vehicles - DMS{% endblock %}
+{% block content %}
+<h1>Rescue Vehicle Fleet</h1>
+<div class="page-sub">Track vehicle availability and status</div>
+<div id="msg"></div>
+
+<div class="panel">
+  <div class="toolbar">
+    <select id="f-status">
+      <option value="">All Status</option>
+      <option>Available</option><option>Assigned</option><option>On Mission</option><option>Maintenance</option>
+    </select>
+    <button onclick="loadVehicles()">Filter</button>
+  </div>
+  <div id="table"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadVehicles() {
+  const params = new URLSearchParams();
+  const status = document.getElementById("f-status").value;
+  if (status) params.set("status", status);
+  const rows = await apiGet("/api/vehicles?" + params.toString());
+  renderTable("table", rows, [
+    { label: "Vehicle Number", key: "vehicle_number" },
+    { label: "Type", key: "vehicle_type" },
+    { label: "Capacity", key: "capacity" },
+    { label: "District", key: "district_name" },
+    { label: "Fuel", key: "fuel_status" },
+    { label: "Status", render: r => badge(r.vehicle_status) },
+  ]);
+}
+loadVehicles();
+</script>
+{% endblock %}

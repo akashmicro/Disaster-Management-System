@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Victims - DMS{% endblock %}
+{% block content %}
+<h1>Affected Area & Victim Tracking</h1>
+<div class="page-sub">Track victims, conditions, and rescue progress</div>
+<div id="msg"></div>
+
+<div class="panel">
+  <div class="toolbar">
+    <input id="f-q" placeholder="Search by name...">
+    <select id="f-condition">
+      <option value="">All Conditions</option>
+      <option>Safe</option><option>Injured</option><option>Critical</option>
+      <option>Hospitalized</option><option>Rescued</option><option>Deceased</option>
+    </select>
+    <button onclick="loadVictims()">Filter</button>
+    <button class="secondary" onclick="openCreate()">+ Add Victim</button>
+  </div>
+  <div id="table"></div>
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h3>Add Victim Record</h3>
+    <div class="form-row"><label>Disaster</label><select id="m-disaster"></select></div>
+    <div class="form-row"><label>Affected Area</label><select id="m-area"></select></div>
+    <div class="form-row"><label>Full Name</label><input id="m-name"></div>
+    <div class="form-row"><label>Age</label><input id="m-age" type="number"></div>
+    <div class="form-row"><label>Gender</label>
+      <select id="m-gender"><option>Male</option><option>Female</option><option>Other</option></select></div>
+    <div class="form-row"><label>Condition</label>
+      <select id="m-condition"><option>Safe</option><option>Injured</option><option>Critical</option>
+        <option>Hospitalized</option><option>Rescued</option><option>Deceased</option></select></div>
+    <div class="form-actions">
+      <button class="secondary" onclick="closeModal()">Cancel</button>
+      <button onclick="submitCreate()">Save</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let disasters = [], areas = [];
+
+async function loadDropdowns() {
+  disasters = await apiGet("/disasters/api/list");
+  document.getElementById("m-disaster").innerHTML = disasters.map(d => `<option value="${d.disaster_id}">${d.disaster_name}</option>`).join("");
+  await refreshAreas();
+  document.getElementById("m-disaster").onchange = refreshAreas;
+}
+async function refreshAreas() {
+  const did = document.getElementById("m-disaster").value;
+  areas = await apiGet("/api/areas" + (did ? `?disaster_id=${did}` : ""));
+  document.getElementById("m-area").innerHTML = areas.map(a => `<option value="${a.area_id}">${a.area_name}</option>`).join("");
+}
+
+async function loadVictims() {
+  const params = new URLSearchParams();
+  const q = document.getElementById("f-q").value;
+  const cond = document.getElementById("f-condition").value;
+  if (q) params.set("q", q);
+  if (cond) params.set("condition", cond);
+  const rows = await apiGet("/api/victims?" + params.toString());
+  renderTable("table", rows, [
+    { label: "Name", key: "full_name" },
+    { label: "Age", key: "age" },
+    { label: "Gender", key: "gender" },
+    { label: "Disaster", key: "disaster_name" },
+    { label: "Area", key: "area_name" },
+    { label: "Condition", render: r => badge(r.condition_status) },
+    { label: "Rescue Status", render: r => badge(r.rescue_status) },
+    { label: "Actions", render: r => `<button class="secondary" onclick="markRescued(${r.victim_id})">Mark Rescued</button>` },
+  ]);
+}
+
+function openCreate() { document.getElementById("modal").classList.add("show"); }
+function closeModal() { document.getElementById("modal").classList.remove("show"); }
+
+async function submitCreate() {
+  try {
+    await apiSend("/api/victims/create", "POST", {
+      disaster_id: document.getElementById("m-disaster").value,
+      area_id: document.getElementById("m-area").value,
+      full_name: document.getElementById("m-name").value,
+      age: Number(document.getElementById("m-age").value) || null,
+      gender: document.getElementById("m-gender").value,
+      condition_status: document.getElementById("m-condition").value,
+    });
+    closeModal();
+    showMsg("msg", "Victim record added.", "success");
+    loadVictims();
+  } catch (e) { showMsg("msg", e.message, "error"); }
+}
+
+async function markRescued(id) {
+  try {
+    await apiSend(`/api/victims/${id}/update`, "PUT", { rescue_status: "Rescued", condition_status: "Rescued" });
+    showMsg("msg", "Victim marked as rescued.", "success");
+    loadVictims();
+  } catch (e) { showMsg("msg", e.message, "error"); }
+}
+
+loadDropdowns().then(loadVictims);
+</script>
+{% endblock %}

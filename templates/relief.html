@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Relief Inventory - DMS{% endblock %}
+{% block content %}
+<h1>Smart Relief Distribution & Stock Alert</h1>
+<div class="page-sub">Live inventory with automatic low-stock alerts</div>
+<div id="msg"></div>
+
+<div class="panel">
+  <h2>Relief Item Inventory</h2>
+  <div id="items-table"></div>
+</div>
+
+<div class="panel">
+  <h2>Distribute Relief (Transaction-safe)</h2>
+  <div class="toolbar">
+    <select id="d-disaster"></select>
+    <select id="d-item"></select>
+    <input id="d-qty" type="number" placeholder="Quantity" value="10">
+    <button onclick="distribute()">Distribute</button>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Recent Distributions</h2>
+  <div id="dist-table"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadItems() {
+  const rows = await apiGet("/relief/api/items");
+  renderTable("items-table", rows, [
+    { label: "Item", key: "item_name" },
+    { label: "Category", key: "category" },
+    { label: "Unit", key: "unit" },
+    { label: "Current Stock", key: "current_stock" },
+    { label: "Minimum Stock", key: "minimum_stock" },
+    { label: "Stock %", key: "stock_pct" },
+    { label: "Alert", render: r => r.stock_alert === "LOW STOCK" ? badge("Critical") : badge("Available") },
+  ]);
+  document.getElementById("d-item").innerHTML = rows.map(r => `<option value="${r.item_id}">${r.item_name} (${r.current_stock} ${r.unit} left)</option>`).join("");
+}
+
+async function loadDisasterOptions() {
+  const disasters = await apiGet("/disasters/api/list");
+  document.getElementById("d-disaster").innerHTML = disasters.map(d => `<option value="${d.disaster_id}">${d.disaster_name}</option>`).join("");
+}
+
+async function loadDistributions() {
+  const rows = await apiGet("/relief/api/distributions");
+  renderTable("dist-table", rows, [
+    { label: "Disaster", key: "disaster_name" },
+    { label: "Item", key: "item_name" },
+    { label: "Quantity", key: "distributed_quantity" },
+    { label: "Unit", key: "unit" },
+    { label: "Date", render: r => new Date(r.distributed_at).toLocaleString() },
+  ]);
+}
+
+async function distribute() {
+  try {
+    const r = await apiSend("/relief/api/distribute", "POST", {
+      disaster_id: document.getElementById("d-disaster").value,
+      item_id: document.getElementById("d-item").value,
+      quantity: Number(document.getElementById("d-qty").value),
+      user_id: 1,
+    });
+    const alertMsg = r.low_stock_alert ? " ⚠ LOW STOCK ALERT triggered!" : "";
+    showMsg("msg", `Relief distributed successfully.${alertMsg}`, r.low_stock_alert ? "error" : "success");
+    loadItems();
+    loadDistributions();
+  } catch (e) { showMsg("msg", e.message, "error"); }
+}
+
+loadItems();
+loadDisasterOptions();
+loadDistributions();
+</script>
+{% endblock %}

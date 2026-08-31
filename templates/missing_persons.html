@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Missing Persons - DMS{% endblock %}
+{% block content %}
+<h1>Missing Person Tracking</h1>
+<div class="page-sub">Search and update the status of missing persons</div>
+<div id="msg"></div>
+
+<div class="panel">
+  <div class="toolbar">
+    <input id="f-q" placeholder="Search by name...">
+    <select id="f-status">
+      <option value="">All Status</option>
+      <option>Missing</option><option>Located</option><option>Rescued</option><option>Reunited</option>
+    </select>
+    <button onclick="loadMissing()">Filter</button>
+    <button class="secondary" onclick="openCreate()">+ Report Missing Person</button>
+  </div>
+  <div id="table"></div>
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h3>Report Missing Person</h3>
+    <div class="form-row"><label>Disaster</label><select id="m-disaster"></select></div>
+    <div class="form-row"><label>Affected Area</label><select id="m-area"></select></div>
+    <div class="form-row"><label>Full Name</label><input id="m-name"></div>
+    <div class="form-row"><label>Age</label><input id="m-age" type="number"></div>
+    <div class="form-row"><label>Gender</label>
+      <select id="m-gender"><option>Male</option><option>Female</option><option>Other</option></select></div>
+    <div class="form-row"><label>Last Seen Location</label><input id="m-lastseen"></div>
+    <div class="form-row"><label>Missing Date</label><input id="m-date" type="date"></div>
+    <div class="form-actions">
+      <button class="secondary" onclick="closeModal()">Cancel</button>
+      <button onclick="submitCreate()">Save</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadDropdowns() {
+  const disasters = await apiGet("/disasters/api/list");
+  document.getElementById("m-disaster").innerHTML = disasters.map(d => `<option value="${d.disaster_id}">${d.disaster_name}</option>`).join("");
+  await refreshAreas();
+  document.getElementById("m-disaster").onchange = refreshAreas;
+}
+async function refreshAreas() {
+  const did = document.getElementById("m-disaster").value;
+  const areas = await apiGet("/api/areas" + (did ? `?disaster_id=${did}` : ""));
+  document.getElementById("m-area").innerHTML = areas.map(a => `<option value="${a.area_id}">${a.area_name}</option>`).join("");
+}
+
+async function loadMissing() {
+  const params = new URLSearchParams();
+  const q = document.getElementById("f-q").value;
+  const status = document.getElementById("f-status").value;
+  if (q) params.set("q", q);
+  if (status) params.set("status", status);
+  const rows = await apiGet("/api/missing?" + params.toString());
+  renderTable("table", rows, [
+    { label: "Name", key: "full_name" },
+    { label: "Age", key: "age" },
+    { label: "Disaster", key: "disaster_name" },
+    { label: "Area", key: "area_name" },
+    { label: "Last Seen", key: "last_seen_location" },
+    { label: "Missing Date", render: r => new Date(r.missing_date).toLocaleDateString() },
+    { label: "Status", render: r => badge(r.status) },
+    { label: "Actions", render: r => `
+      <select onchange="updateStatus(${r.missing_id}, this.value)">
+        <option value="">Update status...</option>
+        <option>Missing</option><option>Located</option><option>Rescued</option><option>Reunited</option>
+      </select>` },
+  ]);
+}
+
+function openCreate() { document.getElementById("modal").classList.add("show"); }
+function closeModal() { document.getElementById("modal").classList.remove("show"); }
+
+async function submitCreate() {
+  try {
+    await apiSend("/api/missing/create", "POST", {
+      disaster_id: document.getElementById("m-disaster").value,
+      area_id: document.getElementById("m-area").value,
+      full_name: document.getElementById("m-name").value,
+      age: Number(document.getElementById("m-age").value) || null,
+      gender: document.getElementById("m-gender").value,
+      last_seen_location: document.getElementById("m-lastseen").value,
+      missing_date: document.getElementById("m-date").value,
+    });
+    closeModal();
+    showMsg("msg", "Missing person reported.", "success");
+    loadMissing();
+  } catch (e) { showMsg("msg", e.message, "error"); }
+}
+
+async function updateStatus(id, status) {
+  if (!status) return;
+  try {
+    await apiSend(`/api/missing/${id}/update`, "PUT", { status });
+    showMsg("msg", "Status updated.", "success");
+    loadMissing();
+  } catch (e) { showMsg("msg", e.message, "error"); }
+}
+
+loadDropdowns().then(loadMissing);
+</script>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Missions - DMS{% endblock %}
+{% block content %}
+<h1>Rescue Mission Tracking</h1>
+<div class="page-sub">Vehicle-linked missions with automatic vehicle availability protection</div>
+<div id="msg"></div>
+
+<div class="panel">
+  <div class="toolbar">
+    <select id="f-status">
+      <option value="">All Status</option>
+      <option>Planned</option><option>Ongoing</option><option>Completed</option><option>Aborted</option>
+    </select>
+    <button onclick="loadMissions()">Filter</button>
+  </div>
+  <div id="table"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadMissions() {
+  const params = new URLSearchParams();
+  const status = document.getElementById("f-status").value;
+  if (status) params.set("status", status);
+  const rows = await apiGet("/api/missions?" + params.toString());
+  renderTable("table", rows, [
+    { label: "Disaster", key: "disaster_name" },
+    { label: "Team", key: "team_name" },
+    { label: "Vehicle", key: "vehicle_number" },
+    { label: "Type", key: "mission_type" },
+    { label: "Start", render: r => new Date(r.start_time).toLocaleString() },
+    { label: "Duration (hrs)", key: "duration_hours" },
+    { label: "Status", render: r => badge(r.mission_status) },
+    { label: "Actions", render: r => r.mission_status === "Completed" || r.mission_status === "Aborted" ? "" :
+      `<button class="secondary" onclick="complete(${r.mission_id})">Mark Completed</button>` },
+  ]);
+}
+
+async function complete(id) {
+  try {
+    await apiSend(`/api/missions/${id}/update-status`, "PUT", { mission_status: "Completed" });
+    showMsg("msg", "Mission marked completed. Vehicle released automatically.", "success");
+    loadMissions();
+  } catch (e) { showMsg("msg", e.message, "error"); }
+}
+
+loadMissions();
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Make a Donation - DMS{% endblock %}
+{% block content %}
+<h1>Make a Donation</h1>
+<p class="muted">Money and material donations are saved directly to MySQL.</p>
+{% if message %}<div class="alert alert-danger">{{ message }}</div>{% endif %}
+<form class="panel form-grid" method="post" action="/donate">
+  <label>Donor name<input name="donor_name" value="{{ values.get('donor_name','') }}" required></label>
+  <label>Email<input name="email" type="email" value="{{ values.get('email','') }}" required></label>
+  <label>Phone<input name="phone" type="tel" value="{{ values.get('phone','') }}" required></label>
+  <label>Donation type<select name="donation_type" id="donation_type" required><option value="">Choose type</option><option>Money</option><option>Material</option></select></label>
+  <label>Purpose<input name="purpose" value="{{ values.get('purpose','') }}" required></label>
+  <label>Disaster / campaign<input name="disaster" value="{{ values.get('disaster','') }}" required></label>
+  <label>Date<input name="donation_date" type="date" value="{{ values.get('donation_date','') }}" required></label>
+  <div id="money-fields" class="form-grid"><label>Amount<input name="amount" type="number" min="0" step="0.01" value="{{ values.get('amount','0') }}"></label><label>Payment method<input name="payment_method" value="{{ values.get('payment_method','') }}"></label><label>Transaction reference<input name="transaction_reference" value="{{ values.get('transaction_reference','') }}"></label></div>
+  <div id="material-fields" class="form-grid"><label>Item name<input name="item_name" value="{{ values.get('item_name','') }}"></label><label>Category<input name="category" value="{{ values.get('category','') }}"></label><label>Quantity<input name="quantity" type="number" min="0" step="0.01" value="{{ values.get('quantity','0') }}"></label><label>Unit<input name="unit" value="{{ values.get('unit','') }}"></label></div>
+  <label>Remarks<textarea name="remarks">{{ values.get('remarks','') }}</textarea></label>
+  <button class="button" type="submit">Save donation</button>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+const type = document.getElementById("donation_type");
+const money = document.getElementById("money-fields");
+const material = document.getElementById("material-fields");
+function updateDonationFields() {
+  const isMaterial = type.value === "Material";
+  money.hidden = isMaterial;
+  material.hidden = !isMaterial;
+  document.querySelector("[name=amount]").value = isMaterial ? "0" : document.querySelector("[name=amount]").value;
+  document.querySelector("[name=quantity]").value = isMaterial ? document.querySelector("[name=quantity]").value : "0";
+}
+type.addEventListener("change", updateDonationFields);
+updateDonationFields();
+</script>
+{% endblock %}

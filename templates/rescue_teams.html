@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Rescue Teams - DMS{% endblock %}
+{% block content %}
+<h1>Smart Rescue Team Assignment</h1>
+<div class="page-sub">Manage rescue teams and get AI-style recommendations for a disaster</div>
+<div id="msg"></div>
+
+<div class="panel">
+  <div class="toolbar">
+    <select id="f-spec">
+      <option value="">All Specializations</option>
+      <option>Flood Rescue</option><option>Medical Rescue</option><option>Fire Rescue</option>
+      <option>Mountain Rescue</option><option>Search & Rescue</option><option>Emergency Medical Team</option>
+    </select>
+    <select id="f-avail">
+      <option value="">All Availability</option>
+      <option>Available</option><option>Deployed</option><option>Unavailable</option>
+    </select>
+    <button onclick="loadTeams()">Filter</button>
+  </div>
+  <div id="table"></div>
+</div>
+
+<div class="panel">
+  <h2>Recommend Teams for a Disaster</h2>
+  <div class="toolbar">
+    <select id="rec-disaster"></select>
+    <button onclick="recommend()">Recommend Suitable Teams</button>
+  </div>
+  <div id="rec-table"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadTeams() {
+  const params = new URLSearchParams();
+  const spec = document.getElementById("f-spec").value;
+  const avail = document.getElementById("f-avail").value;
+  if (spec) params.set("specialization", spec);
+  if (avail) params.set("availability", avail);
+  const rows = await apiGet("/api/teams?" + params.toString());
+  renderTable("table", rows, [
+    { label: "Team Name", key: "team_name" },
+    { label: "Specialization", key: "specialization" },
+    { label: "Leader", key: "team_leader" },
+    { label: "Members", key: "member_count" },
+    { label: "District", key: "district_name" },
+    { label: "Availability", render: r => badge(r.availability_status) },
+  ]);
+}
+
+async function loadDisasterOptions() {
+  const disasters = await apiGet("/disasters/api/list");
+  document.getElementById("rec-disaster").innerHTML = disasters.map(d => `<option value="${d.disaster_id}">${d.disaster_name} (${d.severity_level})</option>`).join("");
+}
+
+async function recommend() {
+  const id = document.getElementById("rec-disaster").value;
+  try {
+    const rows = await apiGet(`/api/teams/recommend/${id}`);
+    renderTable("rec-table", rows, [
+      { label: "Team Name", key: "team_name" },
+      { label: "Specialization", key: "specialization" },
+      { label: "Proximity", key: "proximity" },
+      { label: "Match Score", key: "match_score" },
+      { label: "Members", key: "member_count" },
+      { label: "Availability", render: r => badge(r.availability_status) },
+      { label: "Assign", render: r => `<button class="secondary" onclick="assign(${id}, ${r.team_id})">Assign</button>` },
+    ]);
+  } catch (e) { showMsg("msg", e.message, "error"); }
+}
+
+async function assign(disasterId, teamId) {
+  try {
+    await apiSend("/api/assignments/create", "POST", { disaster_id: disasterId, team_id: teamId });
+    showMsg("msg", "Team assigned to disaster.", "success");
+    loadTeams();
+  } catch (e) { showMsg("msg", e.message, "error"); }
+}
+
+loadTeams();
+loadDisasterOptions();
+</script>
+{% endblock %}

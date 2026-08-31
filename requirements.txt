@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+mysql-connector-python
+python-dotenv
+jinja2
+python-multipart
+passlib[bcrypt]
+bcrypt<5
+itsdangerous

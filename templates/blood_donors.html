@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Blood Donors - DMS{% endblock %}
+{% block content %}
+<h1>Emergency Blood Donor Finder</h1>
+<div class="page-sub">Search available donors and manage hospital blood requests</div>
+<div id="msg"></div>
+
+<div class="panel">
+  <h2>Blood Requests</h2>
+  <div id="req-table"></div>
+</div>
+
+<div class="panel">
+  <h2>Find Donors for a Request</h2>
+  <div class="toolbar">
+    <select id="req-select"></select>
+    <button onclick="findDonors()">Find Matching Donors</button>
+  </div>
+  <div id="donor-table"></div>
+</div>
+
+<div class="panel">
+  <h2>All Registered Donors</h2>
+  <div class="toolbar">
+    <select id="f-bg">
+      <option value="">All Blood Groups</option>
+      <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+      <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+    </select>
+    <button onclick="loadDonors()">Filter</button>
+  </div>
+  <div id="all-donors-table"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadRequests() {
+  const rows = await apiGet("/blood/api/requests");
+  renderTable("req-table", rows, [
+    { label: "Hospital", key: "hospital_name" },
+    { label: "Disaster", key: "disaster_name" },
+    { label: "Blood Group", key: "blood_group" },
+    { label: "Units", key: "required_units" },
+    { label: "Urgency", render: r => badge(r.urgency) },
+    { label: "Status", render: r => badge(r.request_status) },
+    { label: "Available Donors (citywide)", key: "available_donors_citywide" },
+  ]);
+  document.getElementById("req-select").innerHTML = rows.map(r =>
+    `<option value="${r.request_id}">${r.hospital_name} - ${r.blood_group} (${r.required_units} units)</option>`).join("");
+}
+
+async function findDonors() {
+  const id = document.getElementById("req-select").value;
+  try {
+    const rows = await apiGet(`/blood/api/requests/${id}/find-donors`);
+    renderTable("donor-table", rows, [
+      { label: "Donor", key: "full_name" },
+      { label: "Blood Group", key: "blood_group" },
+      { label: "Phone", key: "phone" },
+      { label: "District", key: "district_name" },
+      { label: "Proximity", key: "proximity" },
+      { label: "Last Donation", render: r => r.last_donation_date ? new Date(r.last_donation_date).toLocaleDateString() : "N/A" },
+    ]);
+  } catch (e) { showMsg("msg", e.message, "error"); }
+}
+
+async function loadDonors() {
+  const params = new URLSearchParams();
+  const bg = document.getElementById("f-bg").value;
+  if (bg) params.set("blood_group", bg);
+  const rows = await apiGet("/blood/api/donors?" + params.toString());
+  renderTable("all-donors-table", rows, [
+    { label: "Name", key: "full_name" },
+    { label: "Blood Group", key: "blood_group" },
+    { label: "Phone", key: "phone" },
+    { label: "District", key: "district_name" },
+    { label: "Available", render: r => r.is_available ? badge("Available") : badge("Unavailable") },
+  ]);
+}
+
+loadRequests();
+loadDonors();
+</script>
+{% endblock %}

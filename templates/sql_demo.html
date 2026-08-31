@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}SQL Operations - DMS{% endblock %}
+{% block content %}
+<h1>SQL Operations / Reports</h1>
+<div class="page-sub">Live demonstration of joins, subqueries, views, and aggregate queries — for the DBMS Lab viva</div>
+{% if report.error %}<div class="msg error">{{ report.error }}</div>{% endif %}
+<div class="interactive-grid">
+  <div class="panel query-block">
+    <h2>1. Disaster Type</h2>
+    <form method="post" action="{{ url_for('analytics.sql_demo_disaster_type') }}" class="toolbar">
+      <select name="disaster_type" required>
+        <option value="">Select Disaster Type</option>
+        {% for item in disaster_types %}<option value="{{ item.type_name }}" {{ 'selected' if report.selected_type == item.type_name }}>{{ item.type_name }}</option>{% endfor %}
+      </select>
+      <button type="submit">Run Query</button>
+    </form>
+    {% if report.disaster_type is defined %}
+    <table><thead><tr><th>Disaster Type</th><th>Number of Disasters</th></tr></thead><tbody>
+      {% for row in report.disaster_type %}<tr><td>{{ row.disaster_type }}</td><td>{{ row.disaster_count }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+  </div>
+
+  <div class="panel query-block">
+    <h2>2. Maximum Severity</h2>
+    <form method="post" action="{{ url_for('analytics.sql_demo_max_severity') }}" class="toolbar"><button type="submit">Find Highest Severity Disaster</button></form>
+    {% if report.max_severity is defined %}
+    <table><thead><tr><th>Disaster Name</th><th>Severity Score</th></tr></thead><tbody>
+      {% for row in report.max_severity %}<tr><td>{{ row.disaster_name }}</td><td>{{ row.severity_score }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+  </div>
+
+  <div class="panel query-block">
+    <h2>3. Rescue Team</h2>
+    <form method="post" action="{{ url_for('analytics.sql_demo_rescue_team') }}" class="toolbar">
+      <select name="rescue_team" required>
+        <option value="">Select Rescue Team</option>
+        {% for item in rescue_teams %}<option value="{{ item.team_name }}" {{ 'selected' if report.selected_team == item.team_name }}>{{ item.team_name }}</option>{% endfor %}
+      </select><button type="submit">Run Query</button>
+    </form>
+    {% if report.rescue_team is defined %}
+    <table><thead><tr><th>Team Name</th><th>Number of Completed Missions</th></tr></thead><tbody>
+      {% for row in report.rescue_team %}<tr><td>{{ row.team_name }}</td><td>{{ row.completed_missions }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+  </div>
+
+  <div class="panel query-block">
+    <h2>4. District Report</h2>
+    <form method="post" action="{{ url_for('analytics.sql_demo_district') }}" class="toolbar">
+      <select name="district" required>
+        <option value="">Select District</option>
+        {% for item in districts %}<option value="{{ item.district_name }}" {{ 'selected' if report.selected_district == item.district_name }}>{{ item.district_name }}</option>{% endfor %}
+      </select><button type="submit">Search</button>
+    </form>
+    {% if report.district is defined %}
+    <table><thead><tr><th>Total Disasters</th><th>Total Affected People</th><th>Total Injured People</th><th>Total Missing People</th></tr></thead><tbody>
+      {% for row in report.district %}<tr><td>{{ row.total_disasters }}</td><td>{{ row.total_affected_people }}</td><td>{{ row.total_injured_people }}</td><td>{{ row.total_missing_people }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+  </div>
+
+  <div class="panel query-block">
+    <h2>5. Disaster Status</h2>
+    <form method="post" action="{{ url_for('analytics.sql_demo_status') }}" class="toolbar">
+      <select name="status" required>
+        <option value="">Select Status</option>
+        {% for item in statuses %}<option value="{{ item.status }}" {{ 'selected' if report.selected_status == item.status }}>{{ item.status }}</option>{% endfor %}
+      </select><button type="submit">Search</button>
+    </form>
+    {% if report.status is defined %}
+    <table><thead><tr><th>Disaster Name</th><th>Type</th><th>District</th><th>Severity</th><th>Score</th><th>Status</th><th>Reported At</th></tr></thead><tbody>
+      {% for row in report.status %}<tr><td>{{ row.disaster_name }}</td><td>{{ row.disaster_type }}</td><td>{{ row.district_name }}</td><td>{{ row.severity_level }}</td><td>{{ row.severity_score }}</td><td>{{ row.status }}</td><td>{{ row.reported_at }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+  </div>
+
+  <div class="panel query-block">
+    <h2>6. Shelter Report</h2>
+    <form method="post" action="{{ url_for('analytics.sql_demo_shelters') }}" class="toolbar"><button type="submit">Show High Occupancy Shelters</button></form>
+    {% if report.shelters is defined %}
+    <table><thead><tr><th>Shelter Name</th><th>District</th><th>Capacity</th><th>Current Occupancy</th><th>Available Space</th></tr></thead><tbody>
+      {% for row in report.shelters %}<tr><td>{{ row.shelter_name }}</td><td>{{ row.district_name }}</td><td>{{ row.capacity }}</td><td>{{ row.current_occupancy }}</td><td>{{ row.available_space }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+  </div>
+
+  <div class="panel query-block">
+    <h2>7. Relief Stock</h2>
+    <form method="post" action="{{ url_for('analytics.sql_demo_relief_stock') }}" class="toolbar"><button type="submit">Check Low Stock</button></form>
+    {% if report.relief_stock is defined %}
+    <table><thead><tr><th>Item Name</th><th>Current Stock</th><th>Minimum Stock</th><th>Stock Status</th></tr></thead><tbody>
+      {% for row in report.relief_stock %}<tr><td>{{ row.item_name }}</td><td>{{ row.current_stock }}</td><td>{{ row.minimum_stock }}</td><td>{{ row.stock_status }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+  </div>
+</div>
+<div id="queries"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadDemo() {
+  const demo = await apiGet("/api/sql-demo/queries");
+  const container = document.getElementById("queries");
+  container.innerHTML = demo.map((q, idx) => {
+    const cols = q.rows.length ? Object.keys(q.rows[0]) : [];
+    const tableHtml = q.rows.length ? `<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead>
+      <tbody>${q.rows.slice(0,15).map(r => `<tr>${cols.map(c=>`<td>${r[c] ?? ""}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+      : '<p style="color:var(--muted)">No rows returned.</p>';
+    return `<div class="panel query-block">
+      <div class="purpose">${idx+1}. ${q.purpose}</div>
+      <pre>${q.sql}</pre>
+      ${tableHtml}
+    </div>`;
+  }).join("");
+}
+loadDemo();
+</script>
+{% endblock %}

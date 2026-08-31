@@ -1,0 +1,3 @@
+{% extends "base.html" %}{% block content %}<div class="health-page"><h1>DMS Health AI</h1><p class="muted">General education only; this service does not diagnose or prescribe.</p>
+<form class="panel health-form" method="post"><label>Describe your symptoms<textarea name="symptoms" required placeholder="I have fever and cough."></textarea></label><button type="submit">GET GENERAL INFORMATION</button></form>
+{% if answer %}<div class="panel health-answer">{{ answer|safe }}<a class="button" href="/emergency">EMERGENCY HELP</a></div>{% endif %}</div>{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Shelters - DMS{% endblock %}
+{% block content %}
+<h1>Smart Shelter Allocation</h1>
+<div class="page-sub">Monitor capacity and find suitable shelters for evacuees</div>
+<div id="msg"></div>
+
+<div class="panel">
+  <div class="toolbar">
+    <select id="f-status">
+      <option value="">All Status</option>
+      <option>Open</option><option>Full</option><option>Closed</option>
+    </select>
+    <button onclick="loadShelters()">Filter</button>
+  </div>
+  <div id="table"></div>
+</div>
+
+<div class="panel">
+  <h2>Find & Allocate Shelter</h2>
+  <div class="toolbar">
+    <select id="a-disaster"></select>
+    <input id="a-people" type="number" placeholder="People needing shelter" value="20">
+    <button onclick="findShelter()">Find Suitable Shelters</button>
+  </div>
+  <div id="find-table"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadShelters() {
+  const params = new URLSearchParams();
+  const status = document.getElementById("f-status").value;
+  if (status) params.set("status", status);
+  const rows = await apiGet("/shelters/api/list?" + params.toString());
+  renderTable("table", rows, [
+    { label: "Shelter", key: "shelter_name" },
+    { label: "District", key: "district_name" },
+    { label: "Total Capacity", key: "total_capacity" },
+    { label: "Occupied", key: "occupied_capacity" },
+    { label: "Available", key: "available_capacity" },
+    { label: "Occupancy %", key: "occupancy_pct" },
+    { label: "Medical Facility", render: r => r.has_medical_facility ? "Yes" : "No" },
+    { label: "Status", render: r => badge(r.shelter_status) },
+  ]);
+}
+
+async function loadDisasterOptions() {
+  const disasters = await apiGet("/disasters/api/list");
+  document.getElementById("a-disaster").innerHTML = disasters.map(d => `<option value="${d.disaster_id}">${d.disaster_name}</option>`).join("");
+}
+
+async function findShelter() {
+  const id = document.getElementById("a-disaster").value;
+  const people = Number(document.getElementById("a-people").value) || 1;
+  try {
+    const rows = await apiGet(`/shelters/api/find/${id}?people=${people}`);
+    renderTable("find-table", rows, [
+      { label: "Shelter", key: "shelter_name" },
+      { label: "District", key: "district_name" },
+      { label: "Available Capacity", key: "available_capacity" },
+      { label: "Proximity", key: "proximity" },
+      { label: "Medical", render: r => r.has_medical_facility ? "Yes" : "No" },
+      { label: "Allocate", render: r => `<button class="secondary" onclick="allocate(${r.shelter_id}, ${id}, ${people})">Allocate ${people}</button>` },
+    ]);
+  } catch (e) { showMsg("msg", e.message, "error"); }
+}
+
+async function allocate(shelterId, disasterId, people) {
+  try {
+    await apiSend("/shelters/api/allocate", "POST", { shelter_id: shelterId, disaster_id: disasterId, people_count: people });
+    showMsg("msg", "Shelter allocation recorded.", "success");
+    loadShelters();
+    findShelter();
+  } catch (e) { showMsg("msg", e.message, "error"); }
+}
+
+loadShelters();
+loadDisasterOptions();
+</script>
+{% endblock %}
